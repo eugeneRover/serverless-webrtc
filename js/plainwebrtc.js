@@ -79,10 +79,9 @@ pc.onconnection = function (e) {
 
 remoteOfferGot.onclick = async function () {
     const zz = await navigator.clipboard.readText();
-    remoteOffer.value = zz;
-    step2.style.display = 'none';
-    step3.style.display = 'block'
-    
+    document.getElementById('remoteOffer').value = zz;
+    document.getElementById('step2').style.display = 'none';
+    document.getElementById('step3').style.display = 'block';
 
     var _remoteOffer = new RTCSessionDescription(JSON.parse(zz));
     console.log('remoteOffer \n', _remoteOffer);
@@ -115,10 +114,11 @@ localOfferSet.onclick = function () {
 
                     const zz = JSON.stringify(pc.localDescription)
                     localOffer.value = zz;
-                    navigator.clipboard.writeText(zz);
-
-                    step1.style.display = 'none';
-                    step2.style.display = 'block';
+                    navigator.clipboard.writeText(zz)
+                        .then(() => {
+                            document.getElementById('step1').style.display = 'none';
+                            document.getElementById('step2').style.display = 'block';
+                        });
                 }
             }, 2000);
             console.log('setLocalDescription ok');
