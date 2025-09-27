@@ -77,24 +77,28 @@ pc.onconnection = function (e) {
     console.log('onconnection ', e);
 }
 
-remoteOfferGot.onclick = async function () {
-    const zz = await navigator.clipboard.readText();
-    document.getElementById('remoteOffer').value = zz;
+remoteOfferGot.onclick = function () {
     document.getElementById('step2').style.display = 'none';
     document.getElementById('step3').style.display = 'block';
 
-    var _remoteOffer = new RTCSessionDescription(JSON.parse(zz));
-    console.log('remoteOffer \n', _remoteOffer);
-    pc.setRemoteDescription(_remoteOffer).then(function () {
-        console.log('setRemoteDescription ok');
-        if (_remoteOffer.type == "offer") {
-            pc.createAnswer().then(function (description) {
-                console.log('createAnswer 200 ok \n', description);
-                pc.setLocalDescription(description).then(function () { }).catch(errHandler);
-            }).catch(errHandler);
-        }
-    }).catch(errHandler);
+    navigator.clipboard.readText()
+        .then(zz => {
+            console.log('clipboard readText ok', zz);
+            document.getElementById('remoteOffer').value = zz;
+            return new RTCSessionDescription(JSON.parse(zz));
+        })
+        .then(remDesc => Promise.all([
+            pc.setRemoteDescription(remDesc),
+            Promise.resolve(remDesc)
+        ]))
+        .then(([_, remDesc]) => remDesc.type == "offer" 
+                ? pc.createAnswer()
+                : Promise.reject(new Error('remoteDescription is not an offer'))
+        )
+        .then(desc => pc.setLocalDescription(desc))
+        .catch(errHandler);
 }
+
 localOfferSet.onclick = function () {
     if (chatEnabled) {
         _chatChannel = pc.createDataChannel('chatChannel');
@@ -103,28 +107,26 @@ localOfferSet.onclick = function () {
         chatChannel(_chatChannel);
         fileChannel(_fileChannel);
     }
-    pc.createOffer().then(des => {
-        console.log('createOffer ok ');
-        pc.setLocalDescription(des).then(() => {
-            setTimeout(function () {
-                if (pc.iceGatheringState == "complete") {
-                    return;
-                } else {
-                    console.log('after GetherTimeout');
 
-                    const zz = JSON.stringify(pc.localDescription)
-                    localOffer.value = zz;
-                    navigator.clipboard.writeText(zz)
-                        .then(() => {
-                            document.getElementById('step1').style.display = 'none';
-                            document.getElementById('step2').style.display = 'block';
-                        });
-                }
-            }, 2000);
+    pc.createOffer()
+        .then(offer => Promise.all([
+            pc.setLocalDescription(offer),
+            Promise.resolve(offer)
+        ]))
+        .then(([_, offer]) => {
             console.log('setLocalDescription ok');
-        }).catch(errHandler);
-        // For chat
-    }).catch(errHandler);
+            return JSON.stringify(offer);
+        })
+        .then(zz => {
+            document.getElementById('localOffer').value = zz;
+            return navigator.clipboard.writeText(zz)
+        })
+        .then(() => {
+            console.log('copy to clipboard ok'); // TODO remove
+            document.getElementById('step1').style.display = 'none';
+            document.getElementById('step2').style.display = 'block';
+        })
+        .catch(errHandler);
 }
 
 //File transfer
