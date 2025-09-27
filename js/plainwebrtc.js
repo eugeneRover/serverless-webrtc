@@ -77,8 +77,14 @@ pc.onconnection = function (e) {
     console.log('onconnection ', e);
 }
 
-remoteOfferGot.onclick = function () {
-    var _remoteOffer = new RTCSessionDescription(JSON.parse(remoteOffer.value));
+remoteOfferGot.onclick = async function () {
+    const zz = await navigator.clipboard.readText();
+    remoteOffer.value = zz;
+    step2.style.display = 'none';
+    step3.style.display = 'block'
+    
+
+    var _remoteOffer = new RTCSessionDescription(JSON.parse(zz));
     console.log('remoteOffer \n', _remoteOffer);
     pc.setRemoteDescription(_remoteOffer).then(function () {
         console.log('setRemoteDescription ok');
@@ -106,7 +112,13 @@ localOfferSet.onclick = function () {
                     return;
                 } else {
                     console.log('after GetherTimeout');
-                    localOffer.value = JSON.stringify(pc.localDescription);
+
+                    const zz = JSON.stringify(pc.localDescription)
+                    localOffer.value = zz;
+                    navigator.clipboard.writeText(zz);
+
+                    step1.style.display = 'none';
+                    step2.style.display = 'block';
                 }
             }, 2000);
             console.log('setLocalDescription ok');

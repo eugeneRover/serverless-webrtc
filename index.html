@@ -3,51 +3,94 @@
 <head>
 	<title>Plain webRTC</title>
 	<style type="text/css">
+		html {
+			height: 100%;
+		}
+		body {
+			height: 100%;
+		}
 		.sent{
 			color:blue;
+		}
+
+		#step1 {
+			display: block;
+		}
+		#step2 {
+			display: none;
+		}
+		#step3 {
+			display: none;
+			height: 100%;
+		}
+
+		#local {
+			display: block;
+			position: absolute;
+			right: 0;
+			top: 0;
+			height: 30%;
+			z-index: 1;
+		}
+		#remote {
+			z-index: 0;
+			/* width: 100%; */
+			height: 95%;
 		}
 	</style>
 </head>
 <body>
-<div>
+
+<div style="display: none;">
 	<h4> Start by: </h4>
 	<input type="checkbox" id="enable_audio" onclick="getMedia('audio')"> Enable Audio only
 	<input type="checkbox" id="enable_av" onclick="getMedia('both')" checked> Enable Audio Video
 	<input type="checkbox" id="enable_chat" onclick="enableChat()" checked> Enable chat
 
 </div>
-<div>
+<div style="display: none;">
 	<h4>LocalStream</h4>
 	<input type="checkbox" id="enableAudioFile">Audio File
 	<input type="file" id="streamAudioFile">	
 	<br>
-	<!-- <input type="checkbox" id="enable_mic" checked>Microphone -->
+	<input type="checkbox" id="enable_mic" checked>Microphone
 </div>
-<div>
-	<p>
-		<video width=250 id=local controls autoplay></video>
-		Local
-		<textarea rows="4" cols="50"  id=localOffer></textarea>
-		<button id=localOfferSet>CreateOffer</button>	
-	</p>	
+
+
+<div id="step1">
+	<input type="text" cols="10"  id="localOffer"></input>
+	<button id="localOfferSet">Нажми меня</button>	
 </div>
-<div>
-	<p>
-		<video width=250 id=remote controls autoplay></video>
-		Remote
-		<textarea id="remoteOffer" rows="4" cols="50" placeholder="Paste remote SDP"></textarea>
-		<button id=remoteOfferGot>Answer</button>
-	</p>	
+
+<div id="step2">
+	Ссылка скопирована. Теперь:
+	<ol>
+	<li>Заходи в любой мессенджер (Telegram, WhatsApp), в котором ты можешь мне отправить текстовое сообщение</li>
+	<li>Вставь текст и отправь его мне</li>
+	<li>Жди ответа от меня, я пришлю другой текст</li>
+	<li>скопируй мой ответ в мессенджере и возвращайся браузер</li>
+	<li>нажми Кнопку 2</li>
+	</ol>
+	<input type="text" cols="10"  id="remoteOffer"></input>
+	<button id=remoteOfferGot>2</button>
 </div>
-<div id="chat" style="overflow:scroll;"></div>
-<div>
+
+<div id="step3">
+	<video id="local" controls autoplay></video>
+	<video id="remote" controls autoplay></video>
+</div>
+
+
+<div id="chat" style="overflow:scroll; display: none;"></div>
+<div style="display: none;">
 	<br><br>
 	<form action="" onsubmit="event.preventDefault();return sendMsg();">
 		<input id=sendTxt type="text" name="" placeholder="chat here" size="50">
 		<button type="submit">send</button>		
 	</form>
 </div>
-<div>
+
+<div style="display: none;">
 	<p>
 	File transfer:
 	</p>
@@ -63,6 +106,7 @@
 		</p>
 	</div>
 </div>
+
 <script src="js/plainwebrtc.js"></script>
 </body>
 </html>
