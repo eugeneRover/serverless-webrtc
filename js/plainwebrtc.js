@@ -8,12 +8,13 @@ var localStream, _fileChannel, chatEnabled, context, source,
     file,
     bytesPrev = 0;
 
+// enableChat();
+getMedia("both")
+signallingStateChangeHandler();
+
 function errHandler(err) {
     console.log(err);
-}
-
-function enableChat() {
-    enable_chat.checked ? (chatEnabled = true) : (chatEnabled = false);
+    alert("Ошибка: " + err);
 }
 
 function getMedia(mediaType) {
@@ -33,314 +34,91 @@ function getMedia(mediaType) {
     }).catch(errHandler);
 }
 
-enableChat();
-getMedia("both")
-
-function sendMsg() {
-    var text = sendTxt.value;
-    chat.innerHTML = chat.innerHTML + "<pre class=sent>" + text + "</pre>";
-    _chatChannel.send(text);
-    sendTxt.value = "";
-    return false;
-}
-pc.ondatachannel = function (e) {
-    if (e.channel.label == "fileChannel") {
-        console.log('fileChannel Received -', e);
-        _fileChannel = e.channel;
-        fileChannel(e.channel);
-    }
-    if (e.channel.label == "chatChannel") {
-        console.log('chatChannel Received -', e);
-        _chatChannel = e.channel;
-        chatChannel(e.channel);
-    }
-};
-
-pc.onicecandidate = function (e) {
-    var cand = e.candidate;
-    if (!cand) {
-        console.log('iceGatheringState complete\n', pc.localDescription.sdp);
-        localOffer.value = JSON.stringify(pc.localDescription);
-    } else {
-        console.log(cand.candidate);
-    }
-}
-pc.oniceconnectionstatechange = function () {
-    console.log('iceconnectionstatechange: ', pc.iceConnectionState);
-}
 
 pc.ontrack = function (e) {
     console.log('remote ontrack', e.streams);
     remote.srcObject = e.streams[0];
 }
-pc.onconnection = function (e) {
-    console.log('onconnection ', e);
+
+//see https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/connectionstatechange_event
+pc.onconnectionstatechange = function (e) {
+     console.log('onconnectionstatechange');
+     console.log('pc.connectionState: ', pc.connectionState);
+
+    if (pc.connectionState == 'connected') {
+        document.getElementById('start').style.display = 'none';    
+        document.getElementById('have-local-offer').style.display = 'none';    
+        document.getElementById('videos').style.display = 'block';    
+        document.getElementById('connecting').style.display = 'none';
+    }
+    else if (pc.connectionState == 'connecting') {
+        document.getElementById('start').style.display = 'none';    
+        document.getElementById('have-local-offer').style.display = 'none';    
+        document.getElementById('videos').style.display = 'none';
+        document.getElementById('connecting').style.display = 'block';
+    }
 }
 
-remoteOfferGot.onclick = function () {
-    document.getElementById('step2').style.display = 'none';
-    document.getElementById('step3').style.display = 'block';
+// see https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/signalingstatechange_event
+pc.onsignalingstatechange = signallingStateChangeHandler;
 
+function signallingStateChangeHandler() {
+    console.log('onsignalingstatechange');
+    console.log('pc.signalingState: ', pc.signalingState);
+    console.log('pc.connectionState: ', pc.connectionState);
+    console.log('pc.iceGatheringState: ', pc.iceGatheringState);
+    console.log('pc.iceConnectionState: ', pc.iceConnectionState);
+
+    if (pc.signalingState == 'stable' && pc.connectionState == 'new') {
+        document.getElementById('start').style.display = 'block';    
+        document.getElementById('have-local-offer').style.display = 'none';    
+        document.getElementById('connecting').style.display = 'none';
+        document.getElementById('videos').style.display = 'none';
+    } 
+    else if (pc.signalingState == 'have-local-offer' && pc.connectionState == 'new') {
+        navigator.clipboard.writeText(JSON.stringify(pc.localDescription));
+        document.getElementById('start').style.display = 'none';    
+        document.getElementById('have-local-offer').style.display = 'block';    
+        document.getElementById('connecting').style.display = 'none';
+        document.getElementById('videos').style.display = 'none';
+    }
+}
+
+remoteOfferGot.onclick = () =>
     navigator.clipboard.readText()
         .then(zz => {
-            console.log('clipboard readText ok', zz);
-            document.getElementById('remoteOffer').value = zz;
-            return new RTCSessionDescription(JSON.parse(zz));
+            const c = JSON.parse(zz);
+            if (!c.type || c.type != 'answer' || !c.sdp) {
+                throw new Error('remoteDescription is not an answer');
+            }
+            return new RTCSessionDescription(c);
         })
-        .then(remDesc => Promise.all([
-            pc.setRemoteDescription(remDesc),
-            Promise.resolve(remDesc)
-        ]))
-        .then(([_, remDesc]) => remDesc.type == "offer" 
-                ? pc.createAnswer()
-                : Promise.reject(new Error('remoteDescription is not an offer'))
-        )
-        .then(desc => pc.setLocalDescription(desc))
+        .then(remDesc => pc.setRemoteDescription(remDesc))
         .catch(errHandler);
-}
 
-localOfferSet.onclick = function () {
-    if (chatEnabled) {
-        _chatChannel = pc.createDataChannel('chatChannel');
-        _fileChannel = pc.createDataChannel('fileChannel');
-        // _fileChannel.binaryType = 'arraybuffer';
-        chatChannel(_chatChannel);
-        fileChannel(_fileChannel);
-    }
 
+createCall.onclick = () => 
     pc.createOffer()
-        .then(offer => Promise.all([
-            pc.setLocalDescription(offer),
-            Promise.resolve(offer)
-        ]))
-        .then(([_, offer]) => {
-            console.log('setLocalDescription ok');
-            return JSON.stringify(offer);
-        })
-        .then(zz => {
-            document.getElementById('localOffer').value = zz;
-            return navigator.clipboard.writeText(zz)
-        })
-        .then(() => {
-            console.log('copy to clipboard ok'); // TODO remove
-            document.getElementById('step1').style.display = 'none';
-            document.getElementById('step2').style.display = 'block';
-        })
+        .then(offer => pc.setLocalDescription(offer))
         .catch(errHandler);
-}
 
-//File transfer
-fileTransfer.onchange = function (e) {
-    var files = fileTransfer.files;
-    if (files.length > 0) {
-        file = files[0];
-        sendFileDom.name = file.name;
-        sendFileDom.size = file.size;
-        sendFileDom.type = file.type;
-        sendFileDom.fileInfo = "areYouReady";
-        console.log(sendFileDom);
-    } else {
-        console.log('No file selected');
-    }
-}
-
-function sendFile() {
-    if (!fileTransfer.value) return;
-    var fileInfo = JSON.stringify(sendFileDom);
-    _fileChannel.send(fileInfo);
-    console.log('file info sent');
-}
-
-
-function fileChannel(e) {
-    _fileChannel.onopen = function (e) {
-        console.log('file channel is open', e);
-    }
-    _fileChannel.onmessage = function (e) {
-        // Figure out data type
-        var type = Object.prototype.toString.call(e.data),
-            data;
-        if (type == "[object ArrayBuffer]") {
-            data = e.data;
-            receiveBuffer.push(data);
-            receivedSize += data.byteLength;
-            recFileProg.value = receivedSize;
-            if (receivedSize == recFileDom.size) {
-                var received = new window.Blob(receiveBuffer);
-                file_download.href = URL.createObjectURL(received);
-                file_download.innerHTML = "download";
-                file_download.download = recFileDom.name;
-                // rest
-                receiveBuffer = [];
-                receivedSize = 0;
-                // clearInterval(window.timer);	
+acceptCall.onclick = () =>
+    navigator.clipboard.readText()
+        .then(zz => {
+            const c = JSON.parse(zz);
+            if (!c.type || c.type != 'offer' || !c.sdp) {
+                throw new Error('remoteDescription is not an offer');
             }
-        } else if (type == "[object String]") {
-            data = JSON.parse(e.data);
-        } else if (type == "[object Blob]") {
-            data = e.data;
-            file_download.href = URL.createObjectURL(data);
-            file_download.innerHTML = "download";
-            file_download.download = recFileDom.name;
-        }
+            return new RTCSessionDescription(c);
+        })
+        .then(remDesc => pc.setRemoteDescription(remDesc))
+        .then(() => pc.createAnswer())
+        .then(answer => pc.setLocalDescription(answer))
+        .then(() => navigator.clipboard.writeText(JSON.stringify(pc.localDescription)))
+        .catch(errHandler);
 
-        // Handle initial msg exchange
-        if (data.fileInfo) {
-            if (data.fileInfo == "areYouReady") {
-                recFileDom = data;
-                recFileProg.max = data.size;
-                var sendData = JSON.stringify({ fileInfo: "readyToReceive" });
-                _fileChannel.send(sendData);
-                // window.timer = setInterval(function(){
-                // 	Stats();
-                // },1000)				
-            } else if (data.fileInfo == "readyToReceive") {
-                sendFileProg.max = sendFileDom.size;
-                sendFileinChannel(); // Start sending the file
-            }
-            console.log('_fileChannel: ', data.fileInfo);
-        }
-    }
-    _fileChannel.onclose = function () {
-        console.log('file channel closed');
-    }
+endCall.onclick = () => {
+    pc.close();
+    window.location.reload();
 }
 
-function chatChannel(e) {
-    _chatChannel.onopen = function (e) {
-        console.log('chat channel is open', e);
-    }
-    _chatChannel.onmessage = function (e) {
-        chat.innerHTML = chat.innerHTML + "<pre>" + e.data + "</pre>"
-    }
-    _chatChannel.onclose = function () {
-        console.log('chat channel closed');
-    }
-}
-
-function sendFileinChannel() {
-    var chunkSize = 16384;
-    var sliceFile = function (offset) {
-        var reader = new window.FileReader();
-        reader.onload = (function () {
-            return function (e) {
-                _fileChannel.send(e.target.result);
-                if (file.size > offset + e.target.result.byteLength) {
-                    window.setTimeout(sliceFile, 0, offset + chunkSize);
-                }
-                sendFileProg.value = offset + e.target.result.byteLength
-            };
-        })(file);
-        var slice = file.slice(offset, offset + chunkSize);
-        reader.readAsArrayBuffer(slice);
-    };
-    sliceFile(0);
-}
-
-function Stats() {
-    pc.getStats(null, function (stats) {
-        for (var key in stats) {
-            var res = stats[key];
-            console.log(res.type, res.googActiveConnection);
-            if (res.type === 'googCandidatePair' &&
-                res.googActiveConnection === 'true') {
-                // calculate current bitrate
-                var bytesNow = res.bytesReceived;
-                console.log('bit rate', (bytesNow - bytesPrev));
-                bytesPrev = bytesNow;
-            }
-        }
-    });
-}
-
-streamAudioFile.onchange = function () {
-    console.log('streamAudioFile');
-    context = new AudioContext();
-    var file = streamAudioFile.files[0];
-    if (file) {
-        if (file.type.match('audio*')) {
-            var reader = new FileReader();
-            reader.onload = (function (readEvent) {
-                context.decodeAudioData(readEvent.target.result, function (buffer) {
-                    // create an audio source and connect it to the file buffer
-                    source = context.createBufferSource();
-                    source.buffer = buffer;
-                    source.start(0);
-
-                    // connect the audio stream to the audio hardware
-                    source.connect(context.destination);
-
-                    // create a destination for the remote browser
-                    var remote = context.createMediaStreamDestination();
-
-                    // connect the remote destination to the source
-                    source.connect(remote);
-
-                    local.srcObject = remote.stream
-                    local.muted = true;
-                    // add the stream to the peer connection
-                    remote.stream.getTracks().forEach((track) => {
-                        pc.addTrack(track, stream);
-                    });
-
-                    // create a SDP offer for the new stream
-                    // pc.createOffer(setLocalAndSendMessage);
-                });
-            });
-
-            reader.readAsArrayBuffer(file);
-        }
-    }
-}
-
-var audioRTC = function (cb) {
-    console.log('streamAudioFile');
-    window.context = new AudioContext();
-    var file = streamAudioFile.files[0];
-    if (file) {
-        if (file.type.match('audio*')) {
-            var reader = new FileReader();
-            reader.onload = (function (readEvent) {
-                context.decodeAudioData(readEvent.target.result, function (buffer) {
-                    // create an audio source and connect it to the file buffer
-                    var source = context.createBufferSource();
-                    source.buffer = buffer;
-                    source.start(0);
-
-                    // connect the audio stream to the audio hardware
-                    source.connect(context.destination);
-
-                    // create a destination for the remote browser
-                    var remote = context.createMediaStreamDestination();
-
-                    // connect the remote destination to the source
-                    source.connect(remote);
-                    window.localStream = remote.stream;
-                    cb({ 'status': 'success', 'stream': true });
-                });
-            });
-
-            reader.readAsArrayBuffer(file);
-        }
-    }
-}
-
-/* Summary
-    //setup your video
-    pc = new RTCPeerConnection
-    navigator.mediaDevices.getUserMedia({ audio: true, video: true })
-    pc.addStream(stream)
-
-    //prepare your sdp1
-    pc.createOffer() - des
-    pc.setLocalDescription(des)
-    pc.onicecandidate
-    pc.localDescription
-    
-    //create sdp from sdp1
-    _remoteOffer = new RTCSessionDescription sdp
-    pc.setRemoteDescription(_remoteOffer)
-    _remoteOffer.type == "offer" && pc.createAnswer() - desc
-    pc.setLocalDescription(description)
-    pc.onaddstream
-*/
