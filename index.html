@@ -9,12 +9,22 @@
 		body {
 			height: 100%;
 		}
-		.sent{
-			color:blue;
+
+		#cfg {
+			display: block;
+			width: 100%;
+		}
+		#cfg textarea {
+			width: 100%;
+		}
+		#cfg button {
+			width: 100%;
+			height: 50px;
+			font-size: 1.5em;
 		}
 
 		#start {
-			display: block;
+			display: none;
 			width: 100%;
 		}
 		#start button {
@@ -68,6 +78,11 @@
 </head>
 <body>
 
+	<div id="cfg">
+		<label for="cfgText">Конфигурация</label>
+		<textarea id="cfgText" rows="4">{ "iceServers": [{ "urls": "stun:stun.l.google.com:19302" }] }</textarea>
+		<button id="saveCfg">Применить</button>	
+	</div>
 
 	<div id="start">
 		<button id="createCall">Создать вызов</button>	
@@ -103,3 +118,9 @@
 <script src="js/plainwebrtc.js"></script>
 </body>
 </html>
+
+<!--
+TODO 
+1. text too long, need to zip and somehow stringify it (maybe base64) - json is too long for telegram
+2. works only on local network for some reason
+-->

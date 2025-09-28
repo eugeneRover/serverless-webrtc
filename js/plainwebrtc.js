@@ -1,90 +1,91 @@
-var conf = { iceServers: [{ "urls": "stun:stun.l.google.com:19302" }] };
-var pc = new RTCPeerConnection(conf);
-var localStream, _fileChannel, chatEnabled, context, source,
-    _chatChannel, sendFileDom = {},
-    recFileDom = {},
-    receiveBuffer = [],
-    receivedSize = 0,
-    file,
-    bytesPrev = 0;
 
-// enableChat();
-getMedia("both")
-signallingStateChangeHandler();
+const applyConfigAndStart = () => {
+    const conf = JSON.parse(cfgText.value);
+    const pc = new RTCPeerConnection(conf);
+
+    getMedia("both", pc);
+
+    const ssch = createSignallingStateChangeHandler(pc);
+    pc.onsignalingstatechange = ssch;
+    pc.onconnectionstatechange = createConnectionStateChangeHandler(pc);
+    pc.ontrack = function (e) {
+        console.log('remote ontrack', e.streams);
+        const rem = document.getElementById('remote');
+        rem.srcObject = e.streams[0];
+    }
+
+    endCall.onclick = createEndCallHandler(pc);
+    acceptCall.onclick = createAcceptCallHandler(pc);
+    createCall.onclick = createCreateCallHandler(pc);
+    remoteOfferGot.onclick = createRemoteOfferGotHandler(pc);
+
+    showOnly(['start']);
+}
+
+function showOnly(idsToShow){
+    ['cfg', 'start', 'have-local-offer', 'videos', 'connecting'].forEach(id => {
+        const d = idsToShow.includes(id) ? 'block' : 'none';
+        document.getElementById(id).style.display = d;
+    });
+}
 
 function errHandler(err) {
     console.log(err);
     alert("Ошибка: " + err);
 }
 
-function getMedia(mediaType) {
+const getMedia = (mediaType, pc) => {
     var constraints = { audio: true, video: true }
     if (mediaType == 'audio') {
         constraints.video = false;
     } else {
-        constraints.video = true
+        constraints.video = true;
     }
-    navigator.mediaDevices.getUserMedia(constraints).then(stream => {
-        localStream = stream;
-        local.srcObject = stream;
-        local.muted = true;
-        stream.getTracks().forEach((track) => {
-            pc.addTrack(track, stream);
-        });
-    }).catch(errHandler);
+    navigator.mediaDevices.getUserMedia(constraints)
+        .then(stream => {
+            const loc = document.getElementById('local');
+            loc.srcObject = stream;
+            loc.muted = true;
+            stream.getTracks().forEach((track) => {
+                pc.addTrack(track, stream);
+            });
+        })
+        .catch(errHandler);
 }
 
 
-pc.ontrack = function (e) {
-    console.log('remote ontrack', e.streams);
-    remote.srcObject = e.streams[0];
-}
+// console.log('pc.iceGatheringState: ', pc.iceGatheringState);
+// console.log('pc.iceConnectionState: ', pc.iceConnectionState);
 
 //see https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/connectionstatechange_event
-pc.onconnectionstatechange = function (e) {
-     console.log('onconnectionstatechange');
-     console.log('pc.connectionState: ', pc.connectionState);
+const createConnectionStateChangeHandler = (pc) => () => {
+     console.log('onconnectionstatechange', pc.connectionState);
 
     if (pc.connectionState == 'connected') {
-        document.getElementById('start').style.display = 'none';    
-        document.getElementById('have-local-offer').style.display = 'none';    
-        document.getElementById('videos').style.display = 'block';    
-        document.getElementById('connecting').style.display = 'none';
+        showOnly(['videos']);
     }
     else if (pc.connectionState == 'connecting') {
-        document.getElementById('start').style.display = 'none';    
-        document.getElementById('have-local-offer').style.display = 'none';    
-        document.getElementById('videos').style.display = 'none';
-        document.getElementById('connecting').style.display = 'block';
+        showOnly(['connecting']);
     }
 }
 
 // see https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/signalingstatechange_event
-pc.onsignalingstatechange = signallingStateChangeHandler;
-
-function signallingStateChangeHandler() {
-    console.log('onsignalingstatechange');
-    console.log('pc.signalingState: ', pc.signalingState);
-    console.log('pc.connectionState: ', pc.connectionState);
-    console.log('pc.iceGatheringState: ', pc.iceGatheringState);
-    console.log('pc.iceConnectionState: ', pc.iceConnectionState);
+const createSignallingStateChangeHandler = (pc) => () => {
+    console.log('onsignalingstatechange', pc.signalingState);
 
     if (pc.signalingState == 'stable' && pc.connectionState == 'new') {
-        document.getElementById('start').style.display = 'block';    
-        document.getElementById('have-local-offer').style.display = 'none';    
-        document.getElementById('connecting').style.display = 'none';
-        document.getElementById('videos').style.display = 'none';
+        showOnly(['start']);
     } 
     else if (pc.signalingState == 'have-local-offer' && pc.connectionState == 'new') {
         navigator.clipboard.writeText(JSON.stringify(pc.localDescription));
-        document.getElementById('start').style.display = 'none';    
-        document.getElementById('have-local-offer').style.display = 'block';    
-        document.getElementById('connecting').style.display = 'none';
-        document.getElementById('videos').style.display = 'none';
+        showOnly(['have-local-offer']);
     }
 }
 
-remoteOfferGot.onclick = () =>
+
+// *************  click handlers create (pure functions) *************
+
+const createRemoteOfferGotHandler = (pc) => () =>
     navigator.clipboard.readText()
         .then(zz => {
             const c = JSON.parse(zz);
@@ -96,13 +97,12 @@ remoteOfferGot.onclick = () =>
         .then(remDesc => pc.setRemoteDescription(remDesc))
         .catch(errHandler);
 
-
-createCall.onclick = () => 
+const createCreateCallHandler = (pc) => () => 
     pc.createOffer()
         .then(offer => pc.setLocalDescription(offer))
         .catch(errHandler);
 
-acceptCall.onclick = () =>
+const createAcceptCallHandler = (pc) => () =>
     navigator.clipboard.readText()
         .then(zz => {
             const c = JSON.parse(zz);
@@ -117,8 +117,29 @@ acceptCall.onclick = () =>
         .then(() => navigator.clipboard.writeText(JSON.stringify(pc.localDescription)))
         .catch(errHandler);
 
-endCall.onclick = () => {
-    pc.close();
-    window.location.reload();
-}
+const createEndCallHandler = (pc) => 
+    () => {
+        pc.close();
+        window.location.reload();
+    };
 
+
+/*
+                            A                  B
+    Press Create offer
+    Copy LocalOffer to CB           
+                                send over tlg
+                              ----------------->
+                                                   Paste the text to Remote Answer
+                                                   Press Answer
+                                                   Copy Local Offer to CB
+                                send over tlg
+                             <------------------   
+Paste text to Remote Answer
+Press answer
+                              connect established
+                             ===================== 
+*/
+
+
+saveCfg.onclick = applyConfigAndStart;
