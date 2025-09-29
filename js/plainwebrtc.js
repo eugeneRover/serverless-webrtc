@@ -118,7 +118,7 @@ const createSignallingStateChangeHandler = (pc) => () => {
 const createRemoteOfferGotHandler = (pc) => () =>
     navigator.clipboard.readText()
         .then(zz => {
-            const c = JSON.parse(zz);
+            const c = decode(zz);
             if (!c.type || c.type != 'answer' || !c.sdp) {
                 throw new Error('remoteDescription is not an answer');
             }
