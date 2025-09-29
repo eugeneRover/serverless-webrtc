@@ -57,8 +57,21 @@ const getMedia = (mediaType, pc) => {
         .catch(errHandler);
 }
 
-const encode = (str) => LZString.compressToUTF16(str);
-const decode = (str) => LZString.decompressFromUTF16(str);
+const encode = (obj) => {
+    const s = JSON.stringify(obj);
+    console.log('encoding - stringified length: ', s.length);
+    
+    const d = LZString.compressToBase64(s);
+    console.log('encoding - compressed length: ', d.length);
+
+    return d;
+};
+const decode = (str) => {
+    console.log('decoding - input length: ', str.length);
+    const d = LZString.decompressFromBase64(str);
+    console.log('decoding - decompressed length: ', d.length);
+    return JSON.parse(d);
+};
 
 const createIceCandidateHandler = (pc) => (event) => {
     console.log('onicecandidate: ', event.candidate);
@@ -117,23 +130,13 @@ const createRemoteOfferGotHandler = (pc) => () =>
 const createCreateCallHandler = (pc) => () => 
     pc.createOffer()
         .then(offer => pc.setLocalDescription(offer))
-        .then(() => {
-            const s = JSON.stringify(pc.localDescription)
-            console.log('stringified length: ', s.length);
-            const d = encode(s);
-            console.log('encoded length: ', d.length);
-            return navigator.clipboard.writeText(d); 
-        })
+        .then(() => navigator.clipboard.writeText(encode(pc.localDescription)))
         .catch(errHandler);
 
 const createAcceptCallHandler = (pc) => () =>
     navigator.clipboard.readText()
         .then(zz => {
-            console.log('input encoded length: ', zz.length);
-            const d = decode(zz);
-            console.log('input decoded length: ', d.length);
-            console.log('input decoded: ', d);
-            const c = JSON.parse(d);
+            const c = decode(zz);
             if (!c.type || c.type != 'offer' || !c.sdp) {
                 throw new Error('remoteDescription is not an offer');
             }
@@ -142,13 +145,7 @@ const createAcceptCallHandler = (pc) => () =>
         .then(remDesc => pc.setRemoteDescription(remDesc))
         .then(() => pc.createAnswer())
         .then(answer => pc.setLocalDescription(answer))
-        .then(() => {
-            const s = JSON.stringify(pc.localDescription);
-            console.log('output stringified length: ', s.length);
-            const d = encode(s);
-            console.log('output encoded length: ', d.length);
-            return navigator.clipboard.writeText(d);
-        })
+        .then(() => navigator.clipboard.writeText(encode(pc.localDescription)))
         .catch(errHandler);
 
 const createEndCallHandler = (pc) => 
