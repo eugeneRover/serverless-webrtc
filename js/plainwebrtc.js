@@ -118,7 +118,10 @@ const createCreateCallHandler = (pc) => () =>
     pc.createOffer()
         .then(offer => pc.setLocalDescription(offer))
         .then(() => {
-            const d = encode(JSON.stringify(pc.localDescription)); // p1
+            const s = JSON.stringify(pc.localDescription)
+            console.log('stringified length: ', s.length);
+            const d = encode(s);
+            console.log('encoded length: ', d.length);
             return navigator.clipboard.writeText(d); 
         })
         .catch(errHandler);
@@ -126,7 +129,10 @@ const createCreateCallHandler = (pc) => () =>
 const createAcceptCallHandler = (pc) => () =>
     navigator.clipboard.readText()
         .then(zz => {
-            const d = decode(zz); // p2
+            console.log('encoded length: ', zz.length);
+            const d = decode(zz);
+            console.log('decoded length: ', d.length);
+            console.log('decoded: ', d);
             const c = JSON.parse(d);
             if (!c.type || c.type != 'offer' || !c.sdp) {
                 throw new Error('remoteDescription is not an offer');
