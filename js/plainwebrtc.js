@@ -129,10 +129,10 @@ const createCreateCallHandler = (pc) => () =>
 const createAcceptCallHandler = (pc) => () =>
     navigator.clipboard.readText()
         .then(zz => {
-            console.log('encoded length: ', zz.length);
+            console.log('input encoded length: ', zz.length);
             const d = decode(zz);
-            console.log('decoded length: ', d.length);
-            console.log('decoded: ', d);
+            console.log('input decoded length: ', d.length);
+            console.log('input decoded: ', d);
             const c = JSON.parse(d);
             if (!c.type || c.type != 'offer' || !c.sdp) {
                 throw new Error('remoteDescription is not an offer');
@@ -142,7 +142,13 @@ const createAcceptCallHandler = (pc) => () =>
         .then(remDesc => pc.setRemoteDescription(remDesc))
         .then(() => pc.createAnswer())
         .then(answer => pc.setLocalDescription(answer))
-        .then(() => navigator.clipboard.writeText(JSON.stringify(pc.localDescription)))
+        .then(() => {
+            const s = JSON.stringify(pc.localDescription);
+            console.log('output stringified length: ', s.length);
+            const d = encode(s);
+            console.log('output encoded length: ', d.length);
+            return navigator.clipboard.writeText(d);
+        })
         .catch(errHandler);
 
 const createEndCallHandler = (pc) => 
