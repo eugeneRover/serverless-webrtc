@@ -13,7 +13,11 @@ const applyConfigAndStart = () => {
         const rem = document.getElementById('remote');
         rem.srcObject = e.streams[0];
     }
-
+    pc.onicecandidate = createIceCandidateHandler(pc);
+    pc.onicecandidateerror = createIceCandidateErrorHandler(pc);
+    pc.oniceconnectionstatechange = createIceConnectionStateChangeHandler(pc);
+    pc.onicegatheringstatechange = createIceGatheringStateChangeHandler(pc);
+    
     endCall.onclick = createEndCallHandler(pc);
     acceptCall.onclick = createAcceptCallHandler(pc);
     createCall.onclick = createCreateCallHandler(pc);
@@ -53,9 +57,23 @@ const getMedia = (mediaType, pc) => {
         .catch(errHandler);
 }
 
+const encode = (str) => LZString.compressToUTF16(str);
+const decode = (str) => LZString.decompressFromUTF16(str);
 
-// console.log('pc.iceGatheringState: ', pc.iceGatheringState);
-// console.log('pc.iceConnectionState: ', pc.iceConnectionState);
+const createIceCandidateHandler = (pc) => (event) => {
+    console.log('onicecandidate: ', event.candidate);
+}
+const createIceCandidateErrorHandler = (pc) => (event) => {
+    console.log('onicecandidateerror: ', event);
+}
+const createIceConnectionStateChangeHandler = (pc) => (event) => {
+    console.log('oniceconnectionstatechange: ', pc.iceConnectionState);
+}
+const createIceGatheringStateChangeHandler = (pc) => (event) => {
+    console.log('onicegatheringstatechange: ', pc.iceGatheringState);
+}
+
+
 
 //see https://developer.mozilla.org/en-US/docs/Web/API/RTCPeerConnection/connectionstatechange_event
 const createConnectionStateChangeHandler = (pc) => () => {
@@ -77,7 +95,6 @@ const createSignallingStateChangeHandler = (pc) => () => {
         showOnly(['start']);
     } 
     else if (pc.signalingState == 'have-local-offer' && pc.connectionState == 'new') {
-        navigator.clipboard.writeText(JSON.stringify(pc.localDescription));
         showOnly(['have-local-offer']);
     }
 }
@@ -100,12 +117,17 @@ const createRemoteOfferGotHandler = (pc) => () =>
 const createCreateCallHandler = (pc) => () => 
     pc.createOffer()
         .then(offer => pc.setLocalDescription(offer))
+        .then(() => {
+            const d = encode(JSON.stringify(pc.localDescription)); // p1
+            return navigator.clipboard.writeText(d); 
+        })
         .catch(errHandler);
 
 const createAcceptCallHandler = (pc) => () =>
     navigator.clipboard.readText()
         .then(zz => {
-            const c = JSON.parse(zz);
+            const d = decode(zz); // p2
+            const c = JSON.parse(d);
             if (!c.type || c.type != 'offer' || !c.sdp) {
                 throw new Error('remoteDescription is not an offer');
             }
